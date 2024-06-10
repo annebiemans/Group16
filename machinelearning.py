@@ -1,3 +1,8 @@
+#%%
+#wat we moeten implementeren:
+#1. zorgen dat je als X meerdere features toe kan voegen (molecuul naam, aantal ringen, aantal H-atomen, bijv)
+#2. zorgen dat je als y meerdere features toe kan voegen (zowel inhibit bij mol1 als inhibit bij mol2).
+# dan ook ff zorgen dat je het juiste model gebruikt: model = MultiOutputClassifier(RandomForestClassifier())
 import pandas as pd
 import rdkit
 from rdkit import Chem
@@ -23,7 +28,8 @@ def data_prep_fp(data_raw):
     return df_molecules
 
 def machine_learning():
-    X = df_molecules['Num_Bonds'].to_numpy().reshape(-1, 1)
+    X = df_molecules['fp'].tolist()
+    #X = df_molecules['Num_Bonds'].to_numpy().reshape(-1, 1)        dit werkt dus ook..?
     y = data_raw['ERK2_inhibition']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     

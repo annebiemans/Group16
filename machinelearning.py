@@ -16,12 +16,14 @@ def read_data():
 def data_prep_fp(data_raw):
     df_molecules = pd.DataFrame(data_raw['SMILES'])
     PandasTools.AddMoleculeColumnToFrame(data_raw, smilesCol='SMILES')
+    #df_molecules['canonical'] = [Chem.MolToSmiles(Chem.MolFromSmiles(x), canonical=True) for x in df_molecules['SMILES']]
     df_molecules['mol'] = [Chem.MolFromSmiles(x) for x in df_molecules['SMILES']]
     df_molecules['fp'] = [AllChem.GetMorganFingerprintAsBitVect(x, 2, nBits=1024) for x in df_molecules['mol']]
+    df_molecules['Num_Bonds'] = [x.GetNumBonds() for x in df_molecules['mol']]
     return df_molecules
 
 def machine_learning():
-    X = df_molecules['fp'].tolist()
+    X = df_molecules['Num_Bonds'].to_numpy().reshape(-1, 1)
     y = data_raw['ERK2_inhibition']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
@@ -57,6 +59,7 @@ def visualize():
 if __name__ == '__main__':
     data_raw = read_data()
     df_molecules = data_prep_fp(data_raw)
+    print(df_molecules)
     clf, X_test, y_test, X_train, y_train = machine_learning()
     y_pred = predict(clf, X_test, y_test, X_train, y_train)
     importances = visualize()

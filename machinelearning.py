@@ -10,9 +10,11 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem import Draw
 from rdkit.Chem import PandasTools
+import math
 
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.multioutput import MultiOutputClassifier
 def read_data():
@@ -35,13 +37,12 @@ def machine_learning():
     y = data_raw[['PKM2_inhibition','ERK2_inhibition']]
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
-    clf = MultiOutputClassifier(RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced'))
-    
-    clf.fit(X_train, y_train)
-
-    return clf, X_test, y_test, X_train, y_train
+    rfc = MultiOutputClassifier(RandomForestClassifier(n_estimators=20, random_state=42, class_weight='balanced'))
+    knn = MultiOutputClassifier(KNeighborsClassifier(n_neighbors=int(math.sqrt(len(df_molecules['mol'])))))
+    return rfc, knn, X_test, y_test, X_train, y_train
 
 def predict(clf, X_test, y_test, X_train, y_train):    
+    clf.fit(X_train, y_train)
     y_pred = clf.predict(X_test)
 
     accuracy = accuracy_score(y_test, y_pred)
@@ -49,7 +50,6 @@ def predict(clf, X_test, y_test, X_train, y_train):
     recall = recall_score(y_test, y_pred, average = 'macro')
     f1 = f1_score(y_test, y_pred,average = 'macro' )
     roc_auc = roc_auc_score(y_test, y_pred, average = 'macro')
-
     print('Accuracy: ', accuracy)
     print('Precision: ', precision)
     print('Recall: ', recall)
@@ -60,15 +60,21 @@ def predict(clf, X_test, y_test, X_train, y_train):
 
 def visualize():
     #Draw.MolsToGridImage(df_molecules['mol'], molsPerRow=4, subImgSize=(200,200))
-    importances = clf.feature_importances_
+    importances = rfc.feature_importances_
 
     return importances
 
 if __name__ == '__main__':
     data_raw = read_data()
     df_molecules = data_prep_fp(data_raw)
-    clf, X_test, y_test, X_train, y_train = machine_learning()
-    y_pred = predict(clf, X_test, y_test, X_train, y_train)
+    rfc, knn, X_test, y_test, X_train, y_train = machine_learning()
+    clf = knn, rfc
+    clf_method = 'knn','rfc'
+    method=0
+    for i in clf:
+        print('method used: ',clf_method[method])
+        method+=1
+        y_pred = predict(i, X_test, y_test, X_train, y_train)
     #importances = visualize()
     #print(importances)
 

@@ -22,14 +22,16 @@ def read_data():
 def data_prep_fp(data_raw):
     df_molecules = pd.DataFrame(data_raw['SMILES'])
     PandasTools.AddMoleculeColumnToFrame(data_raw, smilesCol='SMILES')
+    #hier dus de goede descriptors invoegen, moeten numerieke waarde hebben
     df_molecules['mol'] = [Chem.MolFromSmiles(x) for x in df_molecules['SMILES']]
     df_molecules['fp'] = [AllChem.GetMorganFingerprintAsBitVect(x, 2, nBits=1024) for x in df_molecules['mol']]
     df_molecules['Num_H_Donors'] = df_molecules['mol'].apply(lambda x: Chem.rdMolDescriptors.CalcNumHBD(x))
+    df_molecules['LogP'] = df_molecules['mol'].apply(lambda x: Chem.rdMolDescriptors.CalcCrippenDescriptors(x)[0])
     return df_molecules
 
 def machine_learning():
-    X = df_molecules['fp'].tolist()
-    X = df_molecules['Num_H_Donors'].to_numpy().reshape(-1,1)
+    #deze aanpassen op basis van descriptors
+    X = df_molecules[['Num_H_Donors','LogP']]
     y = data_raw[['PKM2_inhibition','ERK2_inhibition']]
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     

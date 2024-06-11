@@ -27,7 +27,7 @@ def data_prep_fp(data_raw):
 
 def machine_learning():
     X = df_molecules['fp'].tolist()
-    y = data_raw['ERK2_inhibition']  
+    y = data_raw['PKM2_inhibition','ERK2_inhibition']  
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
     clf = MultiOutputClassifier(RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced'))

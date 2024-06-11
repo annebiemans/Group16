@@ -5,6 +5,7 @@
 # dan ook ff zorgen dat je het juiste model gebruikt: model = MultiOutputClassifier(RandomForestClassifier())
 import pandas as pd
 import rdkit
+import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem import Draw
@@ -23,11 +24,13 @@ def data_prep_fp(data_raw):
     PandasTools.AddMoleculeColumnToFrame(data_raw, smilesCol='SMILES')
     df_molecules['mol'] = [Chem.MolFromSmiles(x) for x in df_molecules['SMILES']]
     df_molecules['fp'] = [AllChem.GetMorganFingerprintAsBitVect(x, 2, nBits=1024) for x in df_molecules['mol']]
+    df_molecules['Num_H_Donors'] = df_molecules['mol'].apply(lambda x: Chem.rdMolDescriptors.CalcNumHBD(x))
     return df_molecules
 
 def machine_learning():
     X = df_molecules['fp'].tolist()
-    y = data_raw['PKM2_inhibition','ERK2_inhibition']  
+    X = df_molecules['Num_H_Donors'].to_numpy().reshape(-1,1)
+    y = data_raw[['PKM2_inhibition','ERK2_inhibition']]
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
     clf = MultiOutputClassifier(RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced'))
@@ -40,10 +43,10 @@ def predict(clf, X_test, y_test, X_train, y_train):
     y_pred = clf.predict(X_test)
 
     accuracy = accuracy_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred, zero_division=1)
-    recall = recall_score(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred)
-    roc_auc = roc_auc_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred, average = 'macro', zero_division=1)
+    recall = recall_score(y_test, y_pred, average = 'macro')
+    f1 = f1_score(y_test, y_pred,average = 'macro' )
+    roc_auc = roc_auc_score(y_test, y_pred, average = 'macro')
 
     print('Accuracy: ', accuracy)
     print('Precision: ', precision)
@@ -64,7 +67,7 @@ if __name__ == '__main__':
     df_molecules = data_prep_fp(data_raw)
     clf, X_test, y_test, X_train, y_train = machine_learning()
     y_pred = predict(clf, X_test, y_test, X_train, y_train)
-    importances = visualize()
-    print(importances)
+    #importances = visualize()
+    #print(importances)
 
 

@@ -12,10 +12,10 @@ from rdkit.Chem import Draw
 from rdkit.Chem import PandasTools
 import math
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score, balanced_accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix, classification_report
 from sklearn.multioutput import MultiOutputClassifier
 def read_data():
     data_raw = pd.read_csv('tested_molecules.csv')
@@ -37,8 +37,62 @@ def machine_learning():
     y = data_raw[['PKM2_inhibition','ERK2_inhibition']]
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
-    rfc = MultiOutputClassifier(RandomForestClassifier(n_estimators=20, random_state=42, max_depth=5,max_features='sqrt')) #n_estimators kan anders
-    knn = MultiOutputClassifier(KNeighborsClassifier(n_neighbors=int(math.sqrt(len(df_molecules['mol']))))) #n_neighbors kan anders
+    # MultiOutputClassifier met RandomForestClassifier
+    rfc = MultiOutputClassifier(RandomForestClassifier(random_state=42))
+
+    # MultiOutputClassifier met KNeighborsClassifier
+    knn = MultiOutputClassifier(KNeighborsClassifier())
+
+    # Hyperparameter ruimte
+    param_grid_rfc = {
+        'estimator__n_estimators': [50, 100, 200],
+        'estimator__max_depth': [None, 10, 20, 30],
+        'estimator__min_samples_split': [2, 5, 10],
+        'estimator__min_samples_leaf': [1, 2, 4],
+        'estimator__max_features': ['sqrt', 'log2']
+    }
+
+    # Hyperparameter ruimte voor KNN
+    param_grid_knn = {
+        'estimator__n_neighbors': list(range(1, 31)),
+        'estimator__weights': ['uniform', 'distance'],
+        'estimator__algorithm': ['auto', 'ball_tree', 'kd_tree', 'brute'],
+        'estimator__p': [1, 2]
+    }
+
+    # Gebruik RandomizedSearchCV om de beste hyperparameters te vinden
+    n_iter_search = 100
+    random_search = RandomizedSearchCV(estimator=rfc, param_distributions=param_grid_rfc, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1, verbose=2)
+
+    random_search.fit(X_train, y_train)
+    print("Best parameters found by RandomizedSearchCV: ", random_search.best_params_)
+    
+    # Haal het beste model op
+    best_model = random_search.best_estimator_
+    
+    # Voorspel op de testset
+    y_pred = best_model.predict(X_test)
+    
+    # Evalueer de prestaties
+    print("Classification Report:\n", classification_report(y_test, y_pred))
+        
+
+    # Gebruik RandomizedSearchCV om de beste hyperparameters voor KNN te vinden
+    random_search_knn = RandomizedSearchCV(estimator=knn, param_distributions=param_grid_knn, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1, verbose=2, error_score='raise')
+
+    random_search_knn.fit(X_train, y_train)
+    print("Best parameters found by RandomizedSearchCV for KNN: ", random_search_knn.best_params_)
+    
+    # Haal het beste model op
+    best_model_knn = random_search_knn.best_estimator_
+    
+    # Voorspel op de testset
+    y_pred_knn = best_model_knn.predict(X_test)
+    
+    # Evalueer de prestaties
+    print("Classification Report for KNN:\n", classification_report(y_test, y_pred_knn))
+
+
     return rfc, knn, X_test, y_test, X_train, y_train
 
 def predict(clf, X_test, y_test, X_train, y_train):

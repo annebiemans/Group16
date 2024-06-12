@@ -15,7 +15,7 @@ import math
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 from sklearn.multioutput import MultiOutputClassifier
 def read_data():
     data_raw = pd.read_csv('tested_molecules.csv')
@@ -37,7 +37,7 @@ def machine_learning():
     y = data_raw[['PKM2_inhibition','ERK2_inhibition']]
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
-    rfc = MultiOutputClassifier(RandomForestClassifier(n_estimators=20, random_state=42, class_weight='balanced')) #n_estimators kan anders
+    rfc = MultiOutputClassifier(RandomForestClassifier(n_estimators=20, random_state=42, max_depth=5,max_features='sqrt')) #n_estimators kan anders
     knn = MultiOutputClassifier(KNeighborsClassifier(n_neighbors=int(math.sqrt(len(df_molecules['mol']))))) #n_neighbors kan anders
     return rfc, knn, X_test, y_test, X_train, y_train
 
@@ -62,15 +62,19 @@ def predict(clf, X_test, y_test, X_train, y_train):
     #sensitivity berekenen
     sensitivity_PMK2 = recall_score(y_true['PKM2_inhibition'], y_pred_df['PKM2_inhibition'])
     sensitivity_ERK2 = recall_score(y_true['ERK2_inhibition'], y_pred_df['ERK2_inhibition'])
-    f1 = f1_score(y_true, y_pred,average = 'macro' )
-    roc_auc = roc_auc_score(y_true, y_pred, average = 'macro')
+    #f1 = f1_score(y_true, y_pred,average = 'macro' ) deze mag eigenlijk echt weg
+    #roc_auc = roc_auc_score(y_true, y_pred, average = 'macro') deze kan ook echt weg
     #tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+
+    balanced_accuracy_PKM2 = balanced_accuracy_score(y_true['PKM2_inhibition'], y_pred_df['PKM2_inhibition'])
+    balanced_accuracy_ERK2 = balanced_accuracy_score(y_true['ERK2_inhibition'], y_pred_df['ERK2_inhibition'])
 
     print('Accuracy: ', accuracy_PKM2, accuracy_ERK2)
     print('Precision: ', precision_PKM2, precision_ERK2)
     print('Sensitivity: ', sensitivity_PMK2, sensitivity_ERK2)
-    print('F1: ', f1)
-    print('ROC AUC: ', roc_auc)
+    print('Balanced Accuracy; ', balanced_accuracy_PKM2, balanced_accuracy_ERK2)
+    #print('F1: ', f1)
+    #print('ROC AUC: ', roc_auc)
     #print(tn)
 
     return y_pred
@@ -94,6 +98,5 @@ if __name__ == '__main__':
         y_pred = predict(i, X_test, y_test, X_train, y_train)
     #importances = visualize()
     #print(importances)
-    print('test')
 
 

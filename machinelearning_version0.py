@@ -62,23 +62,23 @@ def machine_learning():
 
     # Gebruik RandomizedSearchCV om de beste hyperparameters te vinden
     n_iter_search = 100
-    random_search = RandomizedSearchCV(estimator=rfc, param_distributions=param_grid_rfc, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1, verbose=2)
+    random_search = RandomizedSearchCV(estimator=rfc, param_distributions=param_grid_rfc, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1)
 
     random_search.fit(X_train, y_train)
     print("Best parameters found by RandomizedSearchCV: ", random_search.best_params_)
     
     # Haal het beste model op
-    best_model = random_search.best_estimator_
+    best_model_rfc = random_search.best_estimator_
     
     # Voorspel op de testset
-    y_pred = best_model.predict(X_test)
+    y_pred = best_model_rfc.predict(X_test)
     
     # Evalueer de prestaties
-    print("Classification Report:\n", classification_report(y_test, y_pred))
+    #print("Classification Report:\n", classification_report(y_test, y_pred))
         
 
     # Gebruik RandomizedSearchCV om de beste hyperparameters voor KNN te vinden
-    random_search_knn = RandomizedSearchCV(estimator=knn, param_distributions=param_grid_knn, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1, verbose=2, error_score='raise')
+    random_search_knn = RandomizedSearchCV(estimator=knn, param_distributions=param_grid_knn, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1, error_score='raise')
 
     random_search_knn.fit(X_train, y_train)
     print("Best parameters found by RandomizedSearchCV for KNN: ", random_search_knn.best_params_)
@@ -90,10 +90,10 @@ def machine_learning():
     y_pred_knn = best_model_knn.predict(X_test)
     
     # Evalueer de prestaties
-    print("Classification Report for KNN:\n", classification_report(y_test, y_pred_knn))
+    #print("Classification Report for KNN:\n", classification_report(y_test, y_pred_knn))
 
 
-    return rfc, knn, X_test, y_test, X_train, y_train
+    return best_model_rfc, best_model_knn, X_test, y_test, X_train, y_train
 
 def predict(clf, X_test, y_test, X_train, y_train):
     # we moeten alles los bekijken, want dan krijg je veel beter inzicht.    
@@ -111,8 +111,8 @@ def predict(clf, X_test, y_test, X_train, y_train):
     accuracy_PKM2 = accuracy_score(y_true['PKM2_inhibition'], y_pred_df['PKM2_inhibition'])
     accuracy_ERK2 = accuracy_score(y_true['ERK2_inhibition'], y_pred_df['ERK2_inhibition'])
     #precision berekenen
-    precision_PKM2 = precision_score(y_true['PKM2_inhibition'], y_pred_df['PKM2_inhibition'], zero_division='warn')
-    precision_ERK2 = precision_score(y_true['ERK2_inhibition'], y_pred_df['ERK2_inhibition'], zero_division='warn')
+    precision_PKM2 = precision_score(y_true['PKM2_inhibition'], y_pred_df['PKM2_inhibition'], zero_division=1)
+    precision_ERK2 = precision_score(y_true['ERK2_inhibition'], y_pred_df['ERK2_inhibition'], zero_division=1)
     #sensitivity berekenen
     sensitivity_PMK2 = recall_score(y_true['PKM2_inhibition'], y_pred_df['PKM2_inhibition'])
     sensitivity_ERK2 = recall_score(y_true['ERK2_inhibition'], y_pred_df['ERK2_inhibition'])
@@ -147,7 +147,7 @@ if __name__ == '__main__':
     clf_method = 'knn','rfc'
     method=0
     for i in clf:
-        print('method used: ',clf_method[method])
+        print('\n\n' + 'method used: ',clf_method[method])
         method+=1
         y_pred = predict(i, X_test, y_test, X_train, y_train)
     #importances = visualize()

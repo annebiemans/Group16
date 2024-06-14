@@ -50,11 +50,11 @@ def machine_learning(df_molecules, data_raw):
     }
 
     n_iter_search = 100
-    random_search_rfc = RandomizedSearchCV(estimator=rfc, param_distributions=param_grid_rfc, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1, verbose=2)
+    random_search_rfc = RandomizedSearchCV(estimator=rfc, param_distributions=param_grid_rfc, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1)
     random_search_rfc.fit(X_train, y_train)
     print("Best parameters found by RandomizedSearchCV for RandomForestClassifier: ", random_search_rfc.best_params_)
     
-    random_search_knn = RandomizedSearchCV(estimator=knn, param_distributions=param_grid_knn, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1, verbose=2)
+    random_search_knn = RandomizedSearchCV(estimator=knn, param_distributions=param_grid_knn, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1)
     random_search_knn.fit(X_train, y_train)
     print("Best parameters found by RandomizedSearchCV for KNeighborsClassifier: ", random_search_knn.best_params_)
     
@@ -68,23 +68,19 @@ def predicting(clf, X_test, y_test, X_train, y_train):
     y_pred = clf.predict(X_test)
     y_pred_df = pd.DataFrame(y_pred, columns=['PKM2_inhibition', 'ERK2_inhibition'])
 
+    print(y_test)
+
     for target in ['PKM2_inhibition', 'ERK2_inhibition']:
         cm = confusion_matrix(y_test[target], y_pred_df[target])
         tn, fp, fn, tp = cm.ravel()
         accuracy = accuracy_score(y_test[target], y_pred_df[target])
-        precision = precision_score(y_test[target], y_pred_df[target], zero_division='warn')
+        precision = precision_score(y_test[target], y_pred_df[target], zero_division=1)
         sensitivity = recall_score(y_test[target], y_pred_df[target])
         balanced_accuracy = balanced_accuracy_score(y_test[target], y_pred_df[target])
         
         print(f'{target} - Accuracy: {accuracy}, Precision: {precision}, Sensitivity: {sensitivity}, Balanced Accuracy: {balanced_accuracy}')
 
     return y_pred
-
-def visualize(model):
-    importances = model.estimators_[0].feature_importances_
-    feature_names = ['Num_H_Donors', 'LogP', 'Num_Rings', 'Num_H_Acceptors']
-    feature_importances = pd.DataFrame(importances, index=feature_names, columns=['importance']).sort_values('importance', ascending=False)
-    print(feature_importances)
 
 if __name__ == '__main__':
     data_raw = read_data()
@@ -96,10 +92,9 @@ if __name__ == '__main__':
     
     print("Evaluating KNeighborsClassifier")
     y_pred_knn = predicting(best_model_knn, X_test, y_test, X_train, y_train)
-    print(y_pred_knn)
-    
-    print("Feature Importances for RandomForestClassifier")
-    visualize(best_model_rfc)
+    #print('predicted:', y_pred_knn)
+    print('actual:', y_test.sum().sum())
+
 
 
 

@@ -12,22 +12,23 @@ from sklearn.multioutput import MultiOutputClassifier
 
 def read_data():
     data_raw = pd.read_csv('tested_molecules.csv')
-    return data_raw
+    df_molecules = pd.read_csv('filtered_molecules.csv')
+    return data_raw, df_molecules
 
-def data_prep_fp(data_raw):
-    df_molecules = pd.DataFrame(data_raw['SMILES'])
-    PandasTools.AddMoleculeColumnToFrame(df_molecules, smilesCol='SMILES')
+#def data_prep_fp(data_raw):
+    #df_molecules = data_raw #pd.DataFrame(data_raw)
+    #PandasTools.AddMoleculeColumnToFrame(df_molecules, smilesCol='SMILES')
     
-    df_molecules['mol'] = [Chem.MolFromSmiles(x) for x in df_molecules['SMILES']]
-    df_molecules['Num_H_Donors'] = df_molecules['mol'].apply(lambda x: rdMolDescriptors.CalcNumHBD(x))
-    df_molecules['LogP'] = df_molecules['mol'].apply(lambda x: rdMolDescriptors.CalcCrippenDescriptors(x)[0])
-    df_molecules['Num_Rings'] = df_molecules['mol'].apply(lambda x: rdMolDescriptors.CalcNumRings(x))
-    df_molecules['Num_H_Acceptors'] = df_molecules['mol'].apply(lambda x: rdMolDescriptors.CalcNumHBA(x))
+    #df_molecules['mol'] = [Chem.MolFromSmiles(x) for x in df_molecules['SMILES']]
+    #df_molecules['Num_H_Donors'] = df_molecules['mol'].apply(lambda x: rdMolDescriptors.CalcNumHBD(x))
+    #df_molecules['LogP'] = df_molecules['mol'].apply(lambda x: rdMolDescriptors.CalcCrippenDescriptors(x)[0])
+    #df_molecules['Num_Rings'] = df_molecules['mol'].apply(lambda x: rdMolDescriptors.CalcNumRings(x))
+    #df_molecules['Num_H_Acceptors'] = df_molecules['mol'].apply(lambda x: rdMolDescriptors.CalcNumHBA(x))
     
-    return df_molecules
+    #return df_molecules
 
 def machine_learning(df_molecules, data_raw):
-    X = df_molecules[['Num_H_Donors', 'LogP', 'Num_Rings', 'Num_H_Acceptors']]
+    X = df_molecules.iloc[:, 1:]
     y = data_raw[['PKM2_inhibition', 'ERK2_inhibition']]
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
@@ -68,8 +69,6 @@ def predicting(clf, X_test, y_test, X_train, y_train):
     y_pred = clf.predict(X_test)
     y_pred_df = pd.DataFrame(y_pred, columns=['PKM2_inhibition', 'ERK2_inhibition'])
 
-    print(y_test)
-
     for target in ['PKM2_inhibition', 'ERK2_inhibition']:
         cm = confusion_matrix(y_test[target], y_pred_df[target])
         tn, fp, fn, tp = cm.ravel()
@@ -83,8 +82,8 @@ def predicting(clf, X_test, y_test, X_train, y_train):
     return y_pred
 
 if __name__ == '__main__':
-    data_raw = read_data()
-    df_molecules = data_prep_fp(data_raw)
+    data_raw, df_molecules = read_data()
+    #df_molecules = data_prep_fp(data_raw)
     best_model_rfc, best_model_knn, X_test, y_test, X_train, y_train = machine_learning(df_molecules, data_raw)
     
     print("Evaluating RandomForestClassifier")
@@ -92,9 +91,6 @@ if __name__ == '__main__':
     
     print("Evaluating KNeighborsClassifier")
     y_pred_knn = predicting(best_model_knn, X_test, y_test, X_train, y_train)
-    #print('predicted:', y_pred_knn)
+    
+    print('predicted:', y_pred_knn)
     print('actual:', y_test.sum().sum())
-
-
-
-

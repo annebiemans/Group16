@@ -7,7 +7,7 @@ from rdkit.Chem import rdMolDescriptors
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, balanced_accuracy_score, confusion_matrix
+from sklearn.metrics import accuracy_score, precision_score, recall_score, balanced_accuracy_score, confusion_matrix, make_scorer
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.preprocessing import StandardScaler
 #from xgboost import XGBClassifier
@@ -17,6 +17,13 @@ def read_data():
     df_molecules = pd.read_csv('filtered_molecules.csv')
     
     return data_raw, df_molecules
+# dit stukje hieronder zorgt dat de score van randomsearch hierop worden gefilterd
+def sensitivity_specificity_score(y_true, y_pred):
+    cm = confusion_matrix(y_true, y_pred)
+    tn, fp, fn, tp = cm.ravel()
+    sensitivity = tp / (tp + fn)
+    specificity = tn / (tn + fp)
+    return (sensitivity + specificity) / 2
 
 def machine_learning(df_molecules, data_raw):
     X = df_molecules.iloc[:, 1:]
@@ -36,6 +43,8 @@ def machine_learning(df_molecules, data_raw):
     knn = MultiOutputClassifier(KNeighborsClassifier())
     gbc = MultiOutputClassifier(GradientBoostingClassifier(random_state=42))
     # xgb = MultiOutputClassifier(XGBClassifier(random_state=42))
+
+    scorer = make_scorer(sensitivity_specificity_score)
 
     param_grid_rfc = {
         'estimator__n_estimators': [50, 100, 200, 300],
@@ -76,15 +85,16 @@ def machine_learning(df_molecules, data_raw):
     # }
 
     n_iter_search = 100
-    random_search_rfc = RandomizedSearchCV(estimator=rfc, param_distributions=param_grid_rfc, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1)
+    #hier zou het eventueel fout kunnen gaan
+    random_search_rfc = RandomizedSearchCV(estimator=rfc, param_distributions=param_grid_rfc, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1, scoring=scorer)
     random_search_rfc.fit(X_train, y_train)
     print("Best parameters found by RandomizedSearchCV for RandomForestClassifier: ", random_search_rfc.best_params_)
     
-    random_search_knn = RandomizedSearchCV(estimator=knn, param_distributions=param_grid_knn, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1)
+    random_search_knn = RandomizedSearchCV(estimator=knn, param_distributions=param_grid_knn, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1, scoring=scorer)
     random_search_knn.fit(X_train, y_train)
     print("Best parameters found by RandomizedSearchCV for KNeighborsClassifier: ", random_search_knn.best_params_)
     
-    random_search_gbc = RandomizedSearchCV(estimator=gbc, param_distributions=param_grid_gbc, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1)
+    random_search_gbc = RandomizedSearchCV(estimator=gbc, param_distributions=param_grid_gbc, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1, scoring=scorer)
     random_search_gbc.fit(X_train, y_train)
     print("Best parameters found by RandomizedSearchCV for GradientBoostingClassifier: ", random_search_gbc.best_params_)
     

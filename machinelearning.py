@@ -6,37 +6,46 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, balanced_accuracy_score, confusion_matrix, make_scorer
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.preprocessing import StandardScaler
+from rdkit import Chem
+from rdkit.Chem import Descriptors
 
 def read_data():
+    # read and save data (smiles, inhibition and descriptor values of molecules)
     data_raw = pd.read_csv('tested_molecules.csv')
     df_molecules = pd.read_csv('descriptors.csv')
-    df_untested_molecules = pd.read_csv('untested_molecules.csv')
     
-    return data_raw, df_molecules, df_untested_molecules
+    return data_raw, df_molecules
 
-# dit stukje hieronder zorgt dat de score van randomsearch hierop worden gefilterd
 def sensitivity_specificity_score(y_true, y_pred):
+    # let RandomizedSearchCV filter based on balanced accuracy instead of accuracy
     cm = confusion_matrix(y_true, y_pred)
     tn, fp, fn, tp = cm.ravel()
     sensitivity = tp / (tp + fn)
     specificity = tn / (tn + fp)
     return (sensitivity + specificity) / 2
 
-def machine_learning(df_molecules, data_raw, kinase, descriptors_used):
-    X = df_molecules.iloc[:, 0:descriptors_used]
+def machine_learning(df_molecules, data_raw, kinase):
+    # train rfc, knn and gbc on tested molecules data
+
+    # create test and train set
+    X = df_molecules.iloc[:, :]
     y = data_raw[[kinase]]
 
+    # scale the descriptor values
     scaler = StandardScaler()
     X = scaler.fit_transform(X)
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
+    # set 3 algorithms
     rfc = MultiOutputClassifier(RandomForestClassifier(random_state=42))
     knn = MultiOutputClassifier(KNeighborsClassifier())
     gbc = MultiOutputClassifier(GradientBoostingClassifier(random_state=42))
-
+    
+    # let RandomizedSearchCV filter based on balanced accuracy instead of accuracy
     scorer = make_scorer(sensitivity_specificity_score)
 
+    # set hyperparameters for all 3 algorithms
     param_grid_rfc = {
         'estimator__n_estimators': [50, 100, 200, 300],
         'estimator__max_depth': [None, 20, 30, 40, 50],
@@ -62,7 +71,9 @@ def machine_learning(df_molecules, data_raw, kinase, descriptors_used):
         'estimator__subsample': [0.8, 0.9, 1.0]
     }
 
+    # find and save best parameters (using cross validation) for each algorithm
     n_iter_search = 100
+
     random_search_rfc = RandomizedSearchCV(estimator=rfc, param_distributions=param_grid_rfc, n_iter=n_iter_search, cv=5, random_state=42, n_jobs=-1, scoring=scorer)
     random_search_rfc.fit(X_train, y_train)
     # print("Best parameters found by RandomizedSearchCV for RandomForestClassifier: ", random_search_rfc.best_params_)
@@ -82,10 +93,12 @@ def machine_learning(df_molecules, data_raw, kinase, descriptors_used):
     return best_model_rfc, best_model_knn, best_model_gbc, X_test, y_test, X_train, y_train
 
 def predicting(clf, X_test, y_test, X_train, y_train):
+    # let a model predict values of test set
     clf.fit(X_train, y_train)
     y_pred = clf.predict(X_test)
     y_pred_df = pd.DataFrame(y_pred, columns=[kinase])
 
+    # print performance scores
     for target in [kinase]:
         cm = confusion_matrix(y_test[target], y_pred_df[target])
         tn, fp, fn, tp = cm.ravel()
@@ -99,12 +112,13 @@ def predicting(clf, X_test, y_test, X_train, y_train):
     return y_pred
 
 if __name__ == '__main__':
-    data_raw, df_molecules, df_untested_molecules = read_data()
+    data_raw, df_molecules = read_data()
 
-    for kinase, descriptors_used in [['PKM2_inhibition', 10], ['ERK2_inhibition', 2]]:
+    # go through training model separatelt for PKM2 and ERK2
+    for kinase in ['PKM2_inhibition', 'ERK2_inhibition']:
         print('\nKINASE:', kinase, "\n")
         
-        best_model_rfc, best_model_knn, best_model_gbc, X_test, y_test, X_train, y_train = machine_learning(df_molecules, data_raw, kinase, descriptors_used)
+        best_model_rfc, best_model_knn, best_model_gbc, X_test, y_test, X_train, y_train = machine_learning(df_molecules, data_raw, kinase)
 
         print("Evaluating RandomForestClassifier")
         y_pred_rfc = predicting(best_model_rfc, X_test, y_test, X_train, y_train)
@@ -121,26 +135,63 @@ if __name__ == '__main__':
         # print('predicted:', y_pred_gbc.sum().sum())
         # print('actual:', y_test.sum().sum())
 
-        # based on balanced average (stated on canvas), for PKM2 gbc works best and for ERK2 rfc works best
+        # accorrding to highest balanced accuracy save best model for PKM2 and ERK2 predictions
         if kinase == 'PKM2_inhibition':
             best_model_PKM2 = best_model_gbc
         elif kinase == 'ERK2_inhibition':
-            best_model_PKM2 = best_model_rfc
+            best_model_ERK2 = best_model_gbc
 
-        # train model on complete dataset --> maak hier def van?
-        X_full = df_molecules.iloc[:, 0:descriptors_used]
+        # (re)train model on complete dataset
+        X_full = df_molecules.iloc[:, :]
         y_full = data_raw[[kinase]]
 
+        # scale the descriptor values
         scaler = StandardScaler()
         X_full = scaler.fit_transform(X_full)
 
         if kinase == 'PKM2_inhibition':
             best_model_PKM2.fit(X_full, y_full)
-            print('scores after training gbc on full dataset')
-            y_pred_PKR2 = predicting(best_model_PKM2, X_full, y_full, X_full, y_full)
+            # print('Scores after training gbc on full dataset')
+            # y_pred_PKR2 = predicting(best_model_PKM2, X_full, y_full, X_full, y_full)
         elif kinase == 'ERK2_inhibition':
             best_model_ERK2.fit(X_full, y_full)
-            print('scores after training rfc on full dataset')
-            y_pred_ERK2 = predicting(best_model_ERK2, X_full, y_full, X_full, y_full)
+            # print('Scores after training rfc on full dataset')
+            # y_pred_ERK2 = predicting(best_model_ERK2, X_full, y_full, X_full, y_full)
 
-# nog toevoegen dat hij inhibition voor untested molecules berekent
+    # run model for untested_molecules.csv
+    df_untested_molecules = pd.read_csv('untested_molecules.csv')
+
+    # found in part 2 (after PCA) # delete
+    final_descriptor = ['fr_aniline', 'VSA_EState10', 'VSA_EState3', 'fr_imide']
+
+    descriptor_funcs = {name: func for name, func in Descriptors.descList if name in final_descriptor}
+    def calc_descriptors(smiles):
+        # calculate only certain descriptors (from part 2)
+        mol = Chem.MolFromSmiles(smiles)
+        descriptors = {}
+        for name, func in descriptor_funcs.items():
+            descriptors[name] = func(mol)
+        
+        return descriptors
+
+    # calculate descriptor values for untested molecules
+    untested_descriptor_data = df_untested_molecules['SMILES'].apply(calc_descriptors)
+    untested_descriptor_df = pd.DataFrame(untested_descriptor_data.tolist())
+    
+    # scale the descriptor values
+    scaler = StandardScaler()
+    untested_descriptor_df = scaler.fit_transform(untested_descriptor_df)
+
+    # predict PKM2 inhibitions for untested molecules
+    PKM2_predictions = best_model_PKM2.predict(untested_descriptor_df)
+    df_untested_molecules['PKM2_inhibition'] = PKM2_predictions
+
+    # predict ERK2 inhibitions for untested molecules
+    ERK2_predictions = best_model_ERK2.predict(untested_descriptor_df)
+    df_untested_molecules['ERK2_inhibition'] = ERK2_predictions
+
+    # print(PKM2_predictions.sum())
+    # print(ERK2_predictions.sum())
+
+    # save final df to csv file
+    df_untested_molecules.to_csv('untested_molecules.csv', index=False)
